@@ -1,0 +1,403 @@
+<!DOCTYPE html><html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Contabilidad de Negocio</title>
+  <script src="https://unpkg.com/localforage/dist/localforage.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f6f8;
+      margin: 0;
+      padding: 20px;
+    }
+    h1, h2, h3 {
+      text-align: center;
+    }
+    form, #filterPanel, #adminPanel {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    input, select, button {
+      padding: 8px;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+      font-size: 13px;
+    }
+    button {
+      background: #007bff;
+      color: #fff;
+      border: none;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #0056b3;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 10px;
+      text-align: center;
+    }
+    tr.agotado {
+      background: #f8d7da;
+    }
+    .agotado-btn {
+      background: red;
+      color: white;
+      border: none;
+      padding: 5px 10px;
+      animation: blink 1s infinite;
+    }
+    @keyframes blink {
+      50% {
+        opacity: 0;
+      }
+    }
+    #productForm input,
+    #productForm button {
+      flex: 1 1 30px;
+      min-width: 100px;
+    }
+    img.product-img {
+      width: 50px;
+      height: auto;
+    }
+    @media (max-width: 600px) {
+      table, th, td {
+        font-size: 12px;
+      }
+      form {
+        flex-direction: column;
+        align-items: center;
+      }
+    }
+  
+@media (max-width: 600px) {
+  table, th, td {
+    font-size: 12px;
+    padding: 6px;
+  }
+  form, #filterPanel, #adminPanel {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  input, select, button {
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .product-img {
+    width: 100%;
+    max-width: 150px;
+  }
+}
+</style>
+</head>
+<body>
+  <h1>📊 Contabilidad de Negocio</h1>  <div id="loginPanel">
+    <h2>Iniciar Sesión</h2>
+    <input id="loginUser" placeholder="Usuario" />
+    <input id="loginPass" type="password" placeholder="Contraseña" />
+    <button id="loginBtn">Ingresar</button>
+  </div>  <div id="welcomeMessage"></div>  <div id="filterPanel" style="display:none;">
+    <h3>Filtrar Productos</h3>
+    <select id="filterCategory"></select>
+    <input id="filterName" placeholder="Buscar Producto" />
+    <button id="applyFilter">🔍 Filtrar</button>
+  </div>  <table id="productTable" style="display:none;">
+    <thead>
+      <tr>
+        <th>ID</th><th>Producto</th><th>Categoría</th><th>Cantidad</th>
+        <th>Precio Unitario</th><th>Precio por Cantidad</th>
+        <th>Comisión</th><th>Imagen</th><th>Acciones</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>  <div id="adminPanel" style="display:none; flex-direction: column; align-items: center;">
+    <h3 id="formTitle">Agregar Producto</h3>
+    <form id="productForm">
+      <input id="productId" type="hidden" />
+      <input id="name" placeholder="Producto" required />
+      <input id="category" placeholder="Categoría" required />
+      <input id="price" type="number" placeholder="Precio Unitario" step="0.01" required />
+      <input id="bulkPrice" type="number" placeholder="Precio por Cantidad" step="0.01" required />
+      <input id="commission" type="number" placeholder="Comisión" step="0.01" />
+      <input id="quantity" type="number" placeholder="Cantidad" required />
+      <input id="image" type="file" accept="image/*" />
+      <button type="submit" id="saveBtn">💾 Guardar</button>
+      <button type="button" id="cancelEditBtn" style="display:none; background:#6c757d;">Cancelar</button>
+    </form><h3>Crear Usuario Nuevo</h3>
+<form id="createUserForm">
+  <input id="newUser" placeholder="Nuevo Usuario" required />
+  <input id="newPass" type="password" placeholder="Contraseña" required />
+  <select id="newRole">
+    <option value="admin">Admin</option>
+    <option value="user">Usuario</option>
+  </select>
+  <button type="submit">Crear</button>
+</form>
+
+<h3>📋 Usuarios Registrados</h3>
+<table id="usersTable">
+  <thead>
+    <tr><th>Usuario</th><th>Contraseña</th><th>Rol</th><th>Acción</th></tr>
+  </thead>
+  <tbody></tbody>
+</table>
+
+  </div><script>
+let products = [];
+let users = [{ username: 'admin', password: 'admin', role: 'admin' }];
+let currentUser = null;
+let lastId = 0;
+
+const loginUser = document.getElementById('loginUser');
+const loginPass = document.getElementById('loginPass');
+const loginPanel = document.getElementById('loginPanel');
+const productTable = document.getElementById('productTable');
+const filterPanel = document.getElementById('filterPanel');
+const filterCategory = document.getElementById('filterCategory');
+const filterName = document.getElementById('filterName');
+const applyFilter = document.getElementById('applyFilter');
+const adminPanel = document.getElementById('adminPanel');
+const welcomeMessage = document.getElementById('welcomeMessage');
+const productForm = document.getElementById('productForm');
+const productIdInput = document.getElementById('productId');
+const nameInput = document.getElementById('name');
+const categoryInput = document.getElementById('category');
+const priceInput = document.getElementById('price');
+const bulkPriceInput = document.getElementById('bulkPrice');
+const commissionInput = document.getElementById('commission');
+const quantityInput = document.getElementById('quantity');
+const imageInput = document.getElementById('image');
+const saveBtn = document.getElementById('saveBtn');
+const cancelEditBtn = document.getElementById('cancelEditBtn');
+const createUserForm = document.getElementById('createUserForm');
+const newUserInput = document.getElementById('newUser');
+const newPassInput = document.getElementById('newPass');
+const newRoleSelect = document.getElementById('newRole');
+const usersTableBody = document.querySelector('#usersTable tbody');
+const formTitle = document.getElementById('formTitle');
+
+async function loadData() {
+  const savedProducts = await localforage.getItem('products');
+  if (savedProducts) products = savedProducts;
+  const savedUsers = await localforage.getItem('users');
+  if (savedUsers) users = savedUsers;
+  const savedLastId = await localforage.getItem('lastId');
+  if (savedLastId) lastId = savedLastId;
+}
+
+function saveProducts() {
+  localforage.setItem('products', products);
+  localforage.setItem('lastId', lastId);
+}
+
+function saveUsers() {
+  localforage.setItem('users', users);
+}
+
+function renderUsers() {
+  usersTableBody.innerHTML = '';
+  users.forEach(u => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${u.username}</td><td>${u.password}</td><td>${u.role}</td><td>${u.username !== currentUser.username ? `<button class="delete-user-btn" data-user="${u.username}">🗑️</button>` : ''}</td>`;
+    usersTableBody.appendChild(tr);
+  });
+}
+
+document.querySelector('#usersTable').addEventListener('click', e => {
+  if (e.target.classList.contains('delete-user-btn')) {
+    const user = e.target.dataset.user;
+    if (confirm(`¿Eliminar al usuario "${user}"?`)) {
+      users = users.filter(u => u.username !== user);
+      saveUsers();
+      renderUsers();
+      alert('Usuario eliminado.');
+    }
+  }
+});
+
+function renderProducts() {
+  const tbody = productTable.querySelector('tbody');
+  tbody.innerHTML = '';
+  const fCat = filterCategory.value.trim().toLowerCase();
+  const fName = filterName.value.trim().toLowerCase();
+  products.forEach(p => {
+    if (fCat && p.category.toLowerCase() !== fCat) return;
+    if (fName && !p.name.toLowerCase().includes(fName)) return;
+    const tr = document.createElement('tr');
+    if (p.quantity <= 0) tr.classList.add('agotado');
+    const comValue = p.commission || 0;
+    const comCalc = (p.price * comValue / 100).toFixed(2);
+    tr.innerHTML = `
+      <td>${p.id}</td>
+      <td>${p.name}</td>
+      <td>${p.category}</td>
+      <td>${p.quantity > 0 ? p.quantity : '<button class="agotado-btn" disabled>Agotado</button>'}</td>
+      <td>$${p.price.toFixed(2)}</td>
+      <td>$${p.bulkPrice.toFixed(2)}</td>
+      <td>${comValue}<br><small>($${comCalc})</small></td>
+      <td>${p.image ? `<img class="product-img" src="${p.image}" /><br><a href="${p.image}" download="producto-${p.id}.png">📥</a>` : 'Sin imagen'}</td>
+      <td>${currentUser.role === 'admin' ? `<button class="edit-btn" data-id="${p.id}">✏️</button><button class="delete-btn" data-id="${p.id}">🗑️</button>` : ''}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function populateFilters() {
+  const categories = [...new Set(products.map(p => p.category))];
+  filterCategory.innerHTML = '<option value="">Todas las Categorías</option>';
+  categories.forEach(cat => {
+    const opt = document.createElement('option');
+    opt.value = cat;
+    opt.textContent = cat;
+    filterCategory.appendChild(opt);
+  });
+}
+
+function resetForm() {
+  productIdInput.value = '';
+  productForm.reset();
+  formTitle.textContent = 'Agregar Producto';
+  saveBtn.textContent = '💾 Guardar';
+  cancelEditBtn.style.display = 'none';
+}
+
+function showWelcome(user) {
+  welcomeMessage.textContent = `👏 Bienvenido, ${user}! 👏`;
+  welcomeMessage.style.display = 'block';
+  setTimeout(() => welcomeMessage.style.display = 'none', 3000);
+}
+
+loginBtn.addEventListener('click', () => {
+  const u = loginUser.value.trim();
+  const p = loginPass.value.trim();
+  const found = users.find(user => user.username === u && user.password === p);
+  if (found) {
+    currentUser = found;
+    loginPanel.style.display = 'none';
+    filterPanel.style.display = 'flex';
+    productTable.style.display = 'table';
+    if (found.role === 'admin') {
+      adminPanel.style.display = 'flex';
+      renderUsers();
+    }
+    populateFilters();
+    renderProducts();
+    showWelcome(found.username);
+  } else {
+    alert('Usuario o contraseña incorrectos.');
+  }
+});
+
+applyFilter.addEventListener('click', () => renderProducts());
+cancelEditBtn.addEventListener('click', () => resetForm());
+
+productForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const idVal = productIdInput.value;
+  const nameVal = nameInput.value.trim();
+  const categoryVal = categoryInput.value.trim();
+  const priceVal = parseFloat(priceInput.value);
+  const bulkPriceVal = parseFloat(bulkPriceInput.value);
+  const commissionVal = parseFloat(commissionInput.value) || 0;
+  const quantityVal = parseInt(quantityInput.value);
+  let imageVal = '';
+
+  if (imageInput.files.length > 0) {
+    const reader = new FileReader();
+    reader.onload = function(event) {
+      imageVal = event.target.result;
+      saveProduct();
+    };
+    reader.readAsDataURL(imageInput.files[0]);
+  } else {
+    saveProduct();
+  }
+
+  function saveProduct() {
+    if (!nameVal || !categoryVal || isNaN(priceVal) || isNaN(bulkPriceVal) || isNaN(quantityVal)) {
+      alert('Por favor, complete todos los campos correctamente.');
+      return;
+    }
+
+    if (idVal) {
+      const index = products.findIndex(p => p.id === Number(idVal));
+      if (index >= 0) {
+        products[index] = { id: Number(idVal), name: nameVal, category: categoryVal, price: priceVal, bulkPrice: bulkPriceVal, commission: commissionVal, quantity: quantityVal, image: imageVal || products[index].image };
+        alert('Producto actualizado.');
+      }
+    } else {
+      lastId++;
+      products.push({ id: lastId, name: nameVal, category: categoryVal, price: priceVal, bulkPrice: bulkPriceVal, commission: commissionVal, quantity: quantityVal, image: imageVal });
+      alert('Producto agregado.');
+    }
+    saveProducts();
+    renderProducts();
+    populateFilters();
+    resetForm();
+  }
+});
+
+createUserForm.addEventListener('submit', (e) => {
+  e.preventDefault();
+  const username = newUserInput.value.trim();
+  const password = newPassInput.value.trim();
+  const role = newRoleSelect.value;
+  if (!username || !password) return alert('Ingrese usuario y contraseña.');
+  if (users.find(u => u.username === username)) return alert('Usuario ya existe.');
+  users.push({ username, password, role });
+  saveUsers();
+  alert('Usuario creado.');
+  renderUsers();
+  createUserForm.reset();
+});
+
+productTable.querySelector('tbody').addEventListener('click', e => {
+  if (e.target.classList.contains('edit-btn')) editProduct(Number(e.target.dataset.id));
+  if (e.target.classList.contains('delete-btn')) deleteProduct(Number(e.target.dataset.id));
+});
+
+function editProduct(id) {
+  const p = products.find(prod => prod.id === id);
+  if (!p) return alert('Producto no encontrado');
+  productIdInput.value = p.id;
+  nameInput.value = p.name;
+  categoryInput.value = p.category;
+  priceInput.value = p.price;
+  bulkPriceInput.value = p.bulkPrice;
+  commissionInput.value = p.commission || 0;
+  quantityInput.value = p.quantity;
+  formTitle.textContent = 'Editar Producto';
+  saveBtn.textContent = '✏️ Actualizar';
+  cancelEditBtn.style.display = 'inline-block';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function deleteProduct(id) {
+  if (confirm('¿Eliminar producto? Esta acción no se puede deshacer.')) {
+    products = products.filter(p => p.id !== id);
+    saveProducts();
+    renderProducts();
+    populateFilters();
+    alert('Producto eliminado.');
+    resetForm();
+  }
+}
+
+(async function init() {
+  await loadData();
+  if (users.length === 0) {
+    users = [{ username: 'admin', password: 'admin', role: 'admin' }];
+    saveUsers();
+  }
+})();
+</script></body>
+</html>
