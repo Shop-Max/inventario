@@ -256,156 +256,41 @@ function populateFilters() {
   });
 }
 
-function resetForm() {
-  document.getElementById('productForm').reset();
-  document.getElementById('productId').value = '';
-  document.getElementById('formTitle').textContent = 'Agregar Producto';
-  document.getElementById('saveBtn').textContent = '💾 Guardar';
-  document.getElementById('cancelEditBtn').style.display = 'none';
-}
-
-function showWelcome(user) {
-  const welcome = document.getElementById('welcomeMessage');
-  welcome.textContent = `👏 Bienvenido, ${user}! 👏`;
-  welcome.style.display = 'block';
-  setTimeout(() => welcome.style.display = 'none', 3000);
-}
-
-document.getElementById('loginBtn').addEventListener('click', () => {
+document.getElementById('loginBtn').addEventListener('click', async () => {
   const u = document.getElementById('loginUser').value.trim();
   const p = document.getElementById('loginPass').value.trim();
   const found = users.find(user => user.username === u && user.password === p);
   if (found) {
     currentUser = found;
+
+    // Carga los productos al iniciar sesión
+    const savedProducts = await localforage.getItem('products');
+    if (savedProducts) products = savedProducts;
+
     document.getElementById('loginPanel').style.display = 'none';
     document.getElementById('filterPanel').style.display = 'flex';
     document.getElementById('productTable').style.display = 'table';
+
     if (found.role === 'admin') {
       document.getElementById('adminPanel').style.display = 'flex';
       renderUsers();
+
+      const btn = document.getElementById('downloadExcelBtn');
+      if (btn) {
+        btn.removeEventListener('click', descargarExcel);
+        btn.addEventListener('click', descargarExcel);
+      }
     }
+
     populateFilters();
     renderProducts();
-    showWelcome(found.username);
+    document.getElementById('welcomeMessage').textContent = `👏 Bienvenido, ${found.username}! 👏`;
   } else {
     alert('Usuario o contraseña incorrectos.');
   }
 });
 
 document.getElementById('applyFilter').addEventListener('click', () => renderProducts());
-document.getElementById('cancelEditBtn').addEventListener('click', () => resetForm());
-
-document.querySelector('#productTable tbody').addEventListener('click', e => {
-  if (e.target.classList.contains('edit-btn')) editProduct(Number(e.target.dataset.id));
-  if (e.target.classList.contains('delete-btn')) deleteProduct(Number(e.target.dataset.id));
-});
-
-document.getElementById('createUserForm').addEventListener('submit', (e) => {
-  e.preventDefault();
-  const username = document.getElementById('newUser').value.trim();
-  const password = document.getElementById('newPass').value.trim();
-  const role = document.getElementById('newRole').value;
-  if (!username || !password) return alert('Ingrese usuario y contraseña.');
-  if (users.find(u => u.username === username)) return alert('Usuario ya existe.');
-  users.push({ username, password, role });
-  saveUsers();
-  alert('Usuario creado.');
-  renderUsers();
-  e.target.reset();
-});
-
-function editProduct(id) {
-  const p = products.find(prod => prod.id === id);
-  if (!p) return alert('Producto no encontrado');
-  document.getElementById('productId').value = p.id;
-  document.getElementById('name').value = p.name;
-  document.getElementById('category').value = p.category;
-  document.getElementById('price').value = p.price;
-  document.getElementById('bulkPrice').value = p.bulkPrice;
-  document.getElementById('commission').value = p.commission || 0;
-  document.getElementById('quantity').value = p.quantity;
-  document.getElementById('formTitle').textContent = 'Editar Producto';
-  document.getElementById('saveBtn').textContent = '✏️ Actualizar';
-  document.getElementById('cancelEditBtn').style.display = 'inline-block';
-  window.scrollTo({ top: 0, behavior: 'smooth' });
-}
-
-function deleteProduct(id) {
-  if (confirm('¿Eliminar producto? Esta acción no se puede deshacer.')) {
-    products = products.filter(p => p.id !== id);
-    saveProducts();
-    renderProducts();
-    populateFilters();
-    alert('Producto eliminado.');
-    resetForm();
-  }
-}
-
-document.getElementById('productForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const idVal = document.getElementById('productId').value;
-  const nameVal = document.getElementById('name').value.trim();
-  const categoryVal = document.getElementById('category').value.trim();
-  const priceVal = parseFloat(document.getElementById('price').value);
-  const bulkPriceVal = parseFloat(document.getElementById('bulkPrice').value);
-  const commissionVal = parseFloat(document.getElementById('commission').value) || 0;
-  const quantityVal = parseInt(document.getElementById('quantity').value);
-  const imageInput = document.getElementById('image');
-  let imageVal = '';
-
-  if (imageInput.files.length > 0) {
-    const reader = new FileReader();
-    reader.onload = function(event) {
-      imageVal = event.target.result;
-      saveProduct();
-    };
-    reader.readAsDataURL(imageInput.files[0]);
-  } else {
-    saveProduct();
-  }
-
-  function saveProduct() {
-    if (!nameVal || !categoryVal || isNaN(priceVal) || isNaN(bulkPriceVal) || isNaN(quantityVal)) {
-      alert('Por favor, complete todos los campos correctamente.');
-      return;
-    }
-
-    if (idVal) {
-      const index = products.findIndex(p => p.id === Number(idVal));
-      if (index >= 0) {
-        products[index] = {
-          id: Number(idVal),
-          name: nameVal,
-          category: categoryVal,
-          price: priceVal,
-          bulkPrice: bulkPriceVal,
-          commission: commissionVal,
-          quantity: quantityVal,
-          image: imageVal || products[index].image
-        };
-        alert('Producto actualizado.');
-      }
-    } else {
-      lastId++;
-      products.push({
-        id: lastId,
-        name: nameVal,
-        category: categoryVal,
-        price: priceVal,
-        bulkPrice: bulkPriceVal,
-        commission: commissionVal,
-        quantity: quantityVal,
-        image: imageVal
-      });
-      alert('Producto agregado.');
-    }
-
-    saveProducts();
-    renderProducts();
-    populateFilters();
-    resetForm();
-  }
-});
 
 (async function init() {
   await loadData();
