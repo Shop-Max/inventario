@@ -1,8 +1,10 @@
-<!DOCTYPE html><html lang="es">
+<!DOCTYPE html>
+<html lang="es">
 <head>
   <meta charset="UTF-8" />
   <title>Contabilidad de Negocio</title>
   <script src="https://unpkg.com/localforage/dist/localforage.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -72,45 +74,43 @@
     @media (max-width: 600px) {
       table, th, td {
         font-size: 12px;
+        padding: 6px;
       }
-      form {
+      form, #filterPanel, #adminPanel {
         flex-direction: column;
-        align-items: center;
+        align-items: stretch;
+      }
+      input, select, button {
+        width: 100%;
+        box-sizing: border-box;
+      }
+      .product-img {
+        width: 100%;
+        max-width: 150px;
       }
     }
-  
-@media (max-width: 600px) {
-  table, th, td {
-    font-size: 12px;
-    padding: 6px;
-  }
-  form, #filterPanel, #adminPanel {
-    flex-direction: column;
-    align-items: stretch;
-  }
-  input, select, button {
-    width: 100%;
-    box-sizing: border-box;
-  }
-  .product-img {
-    width: 100%;
-    max-width: 150px;
-  }
-}
-</style>
+  </style>
 </head>
 <body>
-  <h1>📊 Contabilidad de Negocio</h1>  <div id="loginPanel">
+  <h1>📊 Contabilidad de Negocio</h1>
+
+  <div id="loginPanel">
     <h2>Iniciar Sesión</h2>
     <input id="loginUser" placeholder="Usuario" />
     <input id="loginPass" type="password" placeholder="Contraseña" />
     <button id="loginBtn">Ingresar</button>
-  </div>  <div id="welcomeMessage"></div>  <div id="filterPanel" style="display:none;">
+  </div>
+
+  <div id="welcomeMessage"></div>
+
+  <div id="filterPanel" style="display:none;">
     <h3>Filtrar Productos</h3>
     <select id="filterCategory"></select>
     <input id="filterName" placeholder="Buscar Producto" />
     <button id="applyFilter">🔍 Filtrar</button>
-  </div>  <table id="productTable" style="display:none;">
+  </div>
+
+  <table id="productTable" style="display:none;">
     <thead>
       <tr>
         <th>ID</th><th>Producto</th><th>Categoría</th><th>Cantidad</th>
@@ -119,8 +119,13 @@
       </tr>
     </thead>
     <tbody></tbody>
-  </table>  <div id="adminPanel" style="display:none; flex-direction: column; align-items: center;">
+  </table>
+
+  <div id="adminPanel" style="display:none; flex-direction: column; align-items: center;">
+    <button id="downloadExcelBtn" style="margin: 20px; background: green;">📥 Descargar Excel</button>
+
     <h3 id="formTitle">Agregar Producto</h3>
+
     <form id="productForm">
       <input id="productId" type="hidden" />
       <input id="name" placeholder="Producto" required />
@@ -132,58 +137,33 @@
       <input id="image" type="file" accept="image/*" />
       <button type="submit" id="saveBtn">💾 Guardar</button>
       <button type="button" id="cancelEditBtn" style="display:none; background:#6c757d;">Cancelar</button>
-    </form><h3>Crear Usuario Nuevo</h3>
-<form id="createUserForm">
-  <input id="newUser" placeholder="Nuevo Usuario" required />
-  <input id="newPass" type="password" placeholder="Contraseña" required />
-  <select id="newRole">
-    <option value="admin">Admin</option>
-    <option value="user">Usuario</option>
-  </select>
-  <button type="submit">Crear</button>
-</form>
+    </form>
 
-<h3>📋 Usuarios Registrados</h3>
-<table id="usersTable">
-  <thead>
-    <tr><th>Usuario</th><th>Contraseña</th><th>Rol</th><th>Acción</th></tr>
-  </thead>
-  <tbody></tbody>
-</table>
+    <h3>Crear Usuario Nuevo</h3>
+    <form id="createUserForm">
+      <input id="newUser" placeholder="Nuevo Usuario" required />
+      <input id="newPass" type="password" placeholder="Contraseña" required />
+      <select id="newRole">
+        <option value="admin">Admin</option>
+        <option value="user">Usuario</option>
+      </select>
+      <button type="submit">Crear</button>
+    </form>
 
-  </div><script>
+    <h3>📋 Usuarios Registrados</h3>
+    <table id="usersTable">
+      <thead>
+        <tr><th>Usuario</th><th>Contraseña</th><th>Rol</th><th>Acción</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+<script>
 let products = [];
 let users = [{ username: 'admin', password: 'admin', role: 'admin' }];
 let currentUser = null;
 let lastId = 0;
-
-const loginUser = document.getElementById('loginUser');
-const loginPass = document.getElementById('loginPass');
-const loginPanel = document.getElementById('loginPanel');
-const productTable = document.getElementById('productTable');
-const filterPanel = document.getElementById('filterPanel');
-const filterCategory = document.getElementById('filterCategory');
-const filterName = document.getElementById('filterName');
-const applyFilter = document.getElementById('applyFilter');
-const adminPanel = document.getElementById('adminPanel');
-const welcomeMessage = document.getElementById('welcomeMessage');
-const productForm = document.getElementById('productForm');
-const productIdInput = document.getElementById('productId');
-const nameInput = document.getElementById('name');
-const categoryInput = document.getElementById('category');
-const priceInput = document.getElementById('price');
-const bulkPriceInput = document.getElementById('bulkPrice');
-const commissionInput = document.getElementById('commission');
-const quantityInput = document.getElementById('quantity');
-const imageInput = document.getElementById('image');
-const saveBtn = document.getElementById('saveBtn');
-const cancelEditBtn = document.getElementById('cancelEditBtn');
-const createUserForm = document.getElementById('createUserForm');
-const newUserInput = document.getElementById('newUser');
-const newPassInput = document.getElementById('newPass');
-const newRoleSelect = document.getElementById('newRole');
-const usersTableBody = document.querySelector('#usersTable tbody');
-const formTitle = document.getElementById('formTitle');
 
 async function loadData() {
   const savedProducts = await localforage.getItem('products');
@@ -203,7 +183,32 @@ function saveUsers() {
   localforage.setItem('users', users);
 }
 
+function descargarExcel() {
+  if (!products || products.length === 0) {
+    alert("No hay productos para exportar.");
+    return;
+  }
+
+  const data = products.map(p => ({
+    ID: p.id,
+    Producto: p.name,
+    Categoría: p.category,
+    Cantidad: p.quantity,
+    'Precio Unitario': p.price,
+    'Precio por Cantidad': p.bulkPrice,
+    Comisión: p.commission || 0,
+    'Imagen (Base64)': p.image || 'Sin imagen'
+  }));
+
+  const worksheet = XLSX.utils.json_to_sheet(data);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Productos");
+
+  XLSX.writeFile(workbook, "productos.xlsx");
+}
+
 function renderUsers() {
+  const usersTableBody = document.querySelector('#usersTable tbody');
   usersTableBody.innerHTML = '';
   users.forEach(u => {
     const tr = document.createElement('tr');
@@ -212,23 +217,11 @@ function renderUsers() {
   });
 }
 
-document.querySelector('#usersTable').addEventListener('click', e => {
-  if (e.target.classList.contains('delete-user-btn')) {
-    const user = e.target.dataset.user;
-    if (confirm(`¿Eliminar al usuario "${user}"?`)) {
-      users = users.filter(u => u.username !== user);
-      saveUsers();
-      renderUsers();
-      alert('Usuario eliminado.');
-    }
-  }
-});
-
 function renderProducts() {
-  const tbody = productTable.querySelector('tbody');
+  const tbody = document.querySelector('#productTable tbody');
   tbody.innerHTML = '';
-  const fCat = filterCategory.value.trim().toLowerCase();
-  const fName = filterName.value.trim().toLowerCase();
+  const fCat = document.getElementById('filterCategory').value.trim().toLowerCase();
+  const fName = document.getElementById('filterName').value.trim().toLowerCase();
   products.forEach(p => {
     if (fCat && p.category.toLowerCase() !== fCat) return;
     if (fName && !p.name.toLowerCase().includes(fName)) return;
@@ -252,6 +245,7 @@ function renderProducts() {
 }
 
 function populateFilters() {
+  const filterCategory = document.getElementById('filterCategory');
   const categories = [...new Set(products.map(p => p.category))];
   filterCategory.innerHTML = '<option value="">Todas las Categorías</option>';
   categories.forEach(cat => {
@@ -263,30 +257,31 @@ function populateFilters() {
 }
 
 function resetForm() {
-  productIdInput.value = '';
-  productForm.reset();
-  formTitle.textContent = 'Agregar Producto';
-  saveBtn.textContent = '💾 Guardar';
-  cancelEditBtn.style.display = 'none';
+  document.getElementById('productForm').reset();
+  document.getElementById('productId').value = '';
+  document.getElementById('formTitle').textContent = 'Agregar Producto';
+  document.getElementById('saveBtn').textContent = '💾 Guardar';
+  document.getElementById('cancelEditBtn').style.display = 'none';
 }
 
 function showWelcome(user) {
-  welcomeMessage.textContent = `👏 Bienvenido, ${user}! 👏`;
-  welcomeMessage.style.display = 'block';
-  setTimeout(() => welcomeMessage.style.display = 'none', 3000);
+  const welcome = document.getElementById('welcomeMessage');
+  welcome.textContent = `👏 Bienvenido, ${user}! 👏`;
+  welcome.style.display = 'block';
+  setTimeout(() => welcome.style.display = 'none', 3000);
 }
 
-loginBtn.addEventListener('click', () => {
-  const u = loginUser.value.trim();
-  const p = loginPass.value.trim();
+document.getElementById('loginBtn').addEventListener('click', () => {
+  const u = document.getElementById('loginUser').value.trim();
+  const p = document.getElementById('loginPass').value.trim();
   const found = users.find(user => user.username === u && user.password === p);
   if (found) {
     currentUser = found;
-    loginPanel.style.display = 'none';
-    filterPanel.style.display = 'flex';
-    productTable.style.display = 'table';
+    document.getElementById('loginPanel').style.display = 'none';
+    document.getElementById('filterPanel').style.display = 'flex';
+    document.getElementById('productTable').style.display = 'table';
     if (found.role === 'admin') {
-      adminPanel.style.display = 'flex';
+      document.getElementById('adminPanel').style.display = 'flex';
       renderUsers();
     }
     populateFilters();
@@ -297,18 +292,65 @@ loginBtn.addEventListener('click', () => {
   }
 });
 
-applyFilter.addEventListener('click', () => renderProducts());
-cancelEditBtn.addEventListener('click', () => resetForm());
+document.getElementById('applyFilter').addEventListener('click', () => renderProducts());
+document.getElementById('cancelEditBtn').addEventListener('click', () => resetForm());
 
-productForm.addEventListener('submit', async (e) => {
+document.querySelector('#productTable tbody').addEventListener('click', e => {
+  if (e.target.classList.contains('edit-btn')) editProduct(Number(e.target.dataset.id));
+  if (e.target.classList.contains('delete-btn')) deleteProduct(Number(e.target.dataset.id));
+});
+
+document.getElementById('createUserForm').addEventListener('submit', (e) => {
   e.preventDefault();
-  const idVal = productIdInput.value;
-  const nameVal = nameInput.value.trim();
-  const categoryVal = categoryInput.value.trim();
-  const priceVal = parseFloat(priceInput.value);
-  const bulkPriceVal = parseFloat(bulkPriceInput.value);
-  const commissionVal = parseFloat(commissionInput.value) || 0;
-  const quantityVal = parseInt(quantityInput.value);
+  const username = document.getElementById('newUser').value.trim();
+  const password = document.getElementById('newPass').value.trim();
+  const role = document.getElementById('newRole').value;
+  if (!username || !password) return alert('Ingrese usuario y contraseña.');
+  if (users.find(u => u.username === username)) return alert('Usuario ya existe.');
+  users.push({ username, password, role });
+  saveUsers();
+  alert('Usuario creado.');
+  renderUsers();
+  e.target.reset();
+});
+
+function editProduct(id) {
+  const p = products.find(prod => prod.id === id);
+  if (!p) return alert('Producto no encontrado');
+  document.getElementById('productId').value = p.id;
+  document.getElementById('name').value = p.name;
+  document.getElementById('category').value = p.category;
+  document.getElementById('price').value = p.price;
+  document.getElementById('bulkPrice').value = p.bulkPrice;
+  document.getElementById('commission').value = p.commission || 0;
+  document.getElementById('quantity').value = p.quantity;
+  document.getElementById('formTitle').textContent = 'Editar Producto';
+  document.getElementById('saveBtn').textContent = '✏️ Actualizar';
+  document.getElementById('cancelEditBtn').style.display = 'inline-block';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function deleteProduct(id) {
+  if (confirm('¿Eliminar producto? Esta acción no se puede deshacer.')) {
+    products = products.filter(p => p.id !== id);
+    saveProducts();
+    renderProducts();
+    populateFilters();
+    alert('Producto eliminado.');
+    resetForm();
+  }
+}
+
+document.getElementById('productForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const idVal = document.getElementById('productId').value;
+  const nameVal = document.getElementById('name').value.trim();
+  const categoryVal = document.getElementById('category').value.trim();
+  const priceVal = parseFloat(document.getElementById('price').value);
+  const bulkPriceVal = parseFloat(document.getElementById('bulkPrice').value);
+  const commissionVal = parseFloat(document.getElementById('commission').value) || 0;
+  const quantityVal = parseInt(document.getElementById('quantity').value);
+  const imageInput = document.getElementById('image');
   let imageVal = '';
 
   if (imageInput.files.length > 0) {
@@ -331,73 +373,43 @@ productForm.addEventListener('submit', async (e) => {
     if (idVal) {
       const index = products.findIndex(p => p.id === Number(idVal));
       if (index >= 0) {
-        products[index] = { id: Number(idVal), name: nameVal, category: categoryVal, price: priceVal, bulkPrice: bulkPriceVal, commission: commissionVal, quantity: quantityVal, image: imageVal || products[index].image };
+        products[index] = {
+          id: Number(idVal),
+          name: nameVal,
+          category: categoryVal,
+          price: priceVal,
+          bulkPrice: bulkPriceVal,
+          commission: commissionVal,
+          quantity: quantityVal,
+          image: imageVal || products[index].image
+        };
         alert('Producto actualizado.');
       }
     } else {
       lastId++;
-      products.push({ id: lastId, name: nameVal, category: categoryVal, price: priceVal, bulkPrice: bulkPriceVal, commission: commissionVal, quantity: quantityVal, image: imageVal });
+      products.push({
+        id: lastId,
+        name: nameVal,
+        category: categoryVal,
+        price: priceVal,
+        bulkPrice: bulkPriceVal,
+        commission: commissionVal,
+        quantity: quantityVal,
+        image: imageVal
+      });
       alert('Producto agregado.');
     }
+
     saveProducts();
     renderProducts();
     populateFilters();
     resetForm();
   }
 });
-
-createUserForm.addEventListener('submit', (e) => {
-  e.preventDefault();
-  const username = newUserInput.value.trim();
-  const password = newPassInput.value.trim();
-  const role = newRoleSelect.value;
-  if (!username || !password) return alert('Ingrese usuario y contraseña.');
-  if (users.find(u => u.username === username)) return alert('Usuario ya existe.');
-  users.push({ username, password, role });
-  saveUsers();
-  alert('Usuario creado.');
-  renderUsers();
-  createUserForm.reset();
-});
-
-productTable.querySelector('tbody').addEventListener('click', e => {
-  if (e.target.classList.contains('edit-btn')) editProduct(Number(e.target.dataset.id));
-  if (e.target.classList.contains('delete-btn')) deleteProduct(Number(e.target.dataset.id));
-});
-
-function editProduct(id) {
-  const p = products.find(prod => prod.id === id);
-  if (!p) return alert('Producto no encontrado');
-  productIdInput.value = p.id;
-  nameInput.value = p.name;
-  categoryInput.value = p.category;
-  priceInput.value = p.price;
-  bulkPriceInput.value = p.bulkPrice;
-  commissionInput.value = p.commission || 0;
-  quantityInput.value = p.quantity;
-  formTitle.textContent = 'Editar Producto';
-  saveBtn.textContent = '✏️ Actualizar';
-  cancelEditBtn.style.display = 'inline-block';
-  window.scrollTo({ top: 0, behavior: 'smooth' });
-}
-
-function deleteProduct(id) {
-  if (confirm('¿Eliminar producto? Esta acción no se puede deshacer.')) {
-    products = products.filter(p => p.id !== id);
-    saveProducts();
-    renderProducts();
-    populateFilters();
-    alert('Producto eliminado.');
-    resetForm();
-  }
-}
 
 (async function init() {
   await loadData();
-  if (users.length === 0) {
-    users = [{ username: 'admin', password: 'admin', role: 'admin' }];
-    saveUsers();
-  }
 })();
-</script></body>
+</script>
+</body>
 </html>
