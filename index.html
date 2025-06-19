@@ -5,88 +5,48 @@
   <title>Contabilidad de Negocio</title>
   <script src="https://unpkg.com/localforage/dist/localforage.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #f4f6f8;
-      margin: 0;
-      padding: 20px;
-    }
-    h1, h2, h3 {
-      text-align: center;
-    }
+    body { font-family: Arial, sans-serif; background: #f4f6f8; margin: 0; padding: 20px; }
+    h1, h2, h3 { text-align: center; }
     form, #filterPanel, #adminPanel {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-      gap: 10px;
-      margin-bottom: 20px;
+      display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-bottom: 20px;
     }
     input, select, button {
-      padding: 8px;
-      border-radius: 5px;
-      border: 1px solid #ccc;
-      font-size: 13px;
+      padding: 8px; border-radius: 5px; border: 1px solid #ccc; font-size: 13px;
     }
     button {
-      background: #007bff;
-      color: #fff;
-      border: none;
-      cursor: pointer;
+      background: #007bff; color: #fff; border: none; cursor: pointer;
     }
-    button:hover {
-      background: #0056b3;
-    }
+    button:hover { background: #0056b3; }
     table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 20px;
+      width: 100%; border-collapse: collapse; margin-top: 20px;
     }
     th, td {
-      border: 1px solid #ccc;
-      padding: 10px;
-      text-align: center;
+      border: 1px solid #ccc; padding: 10px; text-align: center;
     }
-    tr.agotado {
-      background: #f8d7da;
-    }
+    tr.agotado { background: #f8d7da; }
     .agotado-btn {
-      background: red;
-      color: white;
-      border: none;
-      padding: 5px 10px;
-      animation: blink 1s infinite;
+      background: red; color: white; border: none; padding: 5px 10px; animation: blink 1s infinite;
     }
-    @keyframes blink {
-      50% {
-        opacity: 0;
-      }
-    }
-    #productForm input,
-    #productForm button {
-      flex: 1 1 30px;
-      min-width: 100px;
+    @keyframes blink { 50% { opacity: 0; } }
+    #productForm input, #productForm button {
+      flex: 1 1 30px; min-width: 100px;
     }
     img.product-img {
-      width: 50px;
-      height: auto;
+      width: 50px; height: auto;
     }
     @media (max-width: 600px) {
-      table, th, td {
-        font-size: 12px;
-        padding: 6px;
-      }
+      table, th, td { font-size: 12px; padding: 6px; }
       form, #filterPanel, #adminPanel {
-        flex-direction: column;
-        align-items: stretch;
+        flex-direction: column; align-items: stretch;
       }
       input, select, button {
-        width: 100%;
-        box-sizing: border-box;
+        width: 100%; box-sizing: border-box;
       }
       .product-img {
-        width: 100%;
-        max-width: 150px;
+        width: 100%; max-width: 150px;
       }
     }
   </style>
@@ -122,7 +82,10 @@
   </table>
 
   <div id="adminPanel" style="display:none; flex-direction: column; align-items: center;">
-    <button id="downloadExcelBtn" style="margin: 20px; background: green;">📥 Descargar Excel</button>
+    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+      <button id="downloadPdfBtn" style="margin: 10px; background: darkred;">📄 Descargar PDF</button>
+      <button id="downloadExcelBtn" style="margin: 10px; background: green;">📥 Descargar Excel</button>
+    </div>
 
     <h3 id="formTitle">Agregar Producto</h3>
 
@@ -138,25 +101,6 @@
       <button type="submit" id="saveBtn">💾 Guardar</button>
       <button type="button" id="cancelEditBtn" style="display:none; background:#6c757d;">Cancelar</button>
     </form>
-
-    <h3>Crear Usuario Nuevo</h3>
-    <form id="createUserForm">
-      <input id="newUser" placeholder="Nuevo Usuario" required />
-      <input id="newPass" type="password" placeholder="Contraseña" required />
-      <select id="newRole">
-        <option value="admin">Admin</option>
-        <option value="user">Usuario</option>
-      </select>
-      <button type="submit">Crear</button>
-    </form>
-
-    <h3>📋 Usuarios Registrados</h3>
-    <table id="usersTable">
-      <thead>
-        <tr><th>Usuario</th><th>Contraseña</th><th>Rol</th><th>Acción</th></tr>
-      </thead>
-      <tbody></tbody>
-    </table>
   </div>
 
 <script>
@@ -179,56 +123,12 @@ function saveProducts() {
   localforage.setItem('lastId', lastId);
 }
 
-function saveUsers() {
-  localforage.setItem('users', users);
-}
-
-function descargarExcel() {
-  if (!products || products.length === 0) {
-    alert("No hay productos para exportar.");
-    return;
-  }
-
-  const data = products.map(p => ({
-    ID: p.id,
-    Producto: p.name,
-    Categoría: p.category,
-    Cantidad: p.quantity,
-    'Precio Unitario': p.price,
-    'Precio por Cantidad': p.bulkPrice,
-    Comisión: p.commission || 0,
-    'Imagen (Base64)': p.image || 'Sin imagen'
-  }));
-
-  const worksheet = XLSX.utils.json_to_sheet(data);
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, "Productos");
-
-  XLSX.writeFile(workbook, "productos.xlsx");
-}
-
-function renderUsers() {
-  const usersTableBody = document.querySelector('#usersTable tbody');
-  usersTableBody.innerHTML = '';
-  users.forEach(u => {
-    const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${u.username}</td><td>${u.password}</td><td>${u.role}</td><td>${u.username !== currentUser.username ? `<button class="delete-user-btn" data-user="${u.username}">🗑️</button>` : ''}</td>`;
-    usersTableBody.appendChild(tr);
-  });
-}
-
 function renderProducts() {
   const tbody = document.querySelector('#productTable tbody');
   tbody.innerHTML = '';
-  const fCat = document.getElementById('filterCategory').value.trim().toLowerCase();
-  const fName = document.getElementById('filterName').value.trim().toLowerCase();
   products.forEach(p => {
-    if (fCat && p.category.toLowerCase() !== fCat) return;
-    if (fName && !p.name.toLowerCase().includes(fName)) return;
     const tr = document.createElement('tr');
     if (p.quantity <= 0) tr.classList.add('agotado');
-    const comValue = p.commission || 0;
-    const comCalc = (p.price * comValue / 100).toFixed(2);
     tr.innerHTML = `
       <td>${p.id}</td>
       <td>${p.name}</td>
@@ -236,61 +136,174 @@ function renderProducts() {
       <td>${p.quantity > 0 ? p.quantity : '<button class="agotado-btn" disabled>Agotado</button>'}</td>
       <td>$${p.price.toFixed(2)}</td>
       <td>$${p.bulkPrice.toFixed(2)}</td>
-      <td>${comValue}<br><small>($${comCalc})</small></td>
-      <td>${p.image ? `<img class="product-img" src="${p.image}" /><br><a href="${p.image}" download="producto-${p.id}.png">📥</a>` : 'Sin imagen'}</td>
-      <td>${currentUser.role === 'admin' ? `<button class="edit-btn" data-id="${p.id}">✏️</button><button class="delete-btn" data-id="${p.id}">🗑️</button>` : ''}</td>
+      <td>${p.commission || 0}</td>
+      <td>${p.image ? `<img class="product-img" src="${p.image}" />` : 'Sin imagen'}</td>
+      <td><button class="edit-btn" data-id="${p.id}">✏️</button><button class="delete-btn" data-id="${p.id}">🗑️</button></td>
     `;
     tbody.appendChild(tr);
   });
 }
 
-function populateFilters() {
-  const filterCategory = document.getElementById('filterCategory');
-  const categories = [...new Set(products.map(p => p.category))];
-  filterCategory.innerHTML = '<option value="">Todas las Categorías</option>';
-  categories.forEach(cat => {
-    const opt = document.createElement('option');
-    opt.value = cat;
-    opt.textContent = cat;
-    filterCategory.appendChild(opt);
-  });
+function resetForm() {
+  document.getElementById('productForm').reset();
+  document.getElementById('productId').value = '';
+  document.getElementById('formTitle').textContent = 'Agregar Producto';
+  document.getElementById('saveBtn').textContent = '💾 Guardar';
+  document.getElementById('cancelEditBtn').style.display = 'none';
 }
 
-document.getElementById('loginBtn').addEventListener('click', async () => {
-  const u = document.getElementById('loginUser').value.trim();
-  const p = document.getElementById('loginPass').value.trim();
-  const found = users.find(user => user.username === u && user.password === p);
-  if (found) {
-    currentUser = found;
+document.getElementById('productForm').addEventListener('submit', async function(e) {
+  e.preventDefault();
 
-    // Carga los productos al iniciar sesión
-    const savedProducts = await localforage.getItem('products');
-    if (savedProducts) products = savedProducts;
+  const id = document.getElementById('productId').value;
+  const name = document.getElementById('name').value.trim();
+  const category = document.getElementById('category').value.trim();
+  const price = parseFloat(document.getElementById('price').value);
+  const bulkPrice = parseFloat(document.getElementById('bulkPrice').value);
+  const commission = parseFloat(document.getElementById('commission').value) || 0;
+  const quantity = parseInt(document.getElementById('quantity').value);
+  const imageInput = document.getElementById('image');
 
-    document.getElementById('loginPanel').style.display = 'none';
-    document.getElementById('filterPanel').style.display = 'flex';
-    document.getElementById('productTable').style.display = 'table';
+  if (!name || !category || isNaN(price) || isNaN(bulkPrice) || isNaN(quantity)) {
+    alert("Por favor complete todos los campos obligatorios.");
+    return;
+  }
 
-    if (found.role === 'admin') {
-      document.getElementById('adminPanel').style.display = 'flex';
-      renderUsers();
+  let imageBase64 = '';
+  if (imageInput.files.length > 0) {
+    const file = imageInput.files[0];
+    const reader = new FileReader();
+    reader.onload = function(evt) {
+      imageBase64 = evt.target.result;
+      guardarProducto();
+    };
+    reader.readAsDataURL(file);
+  } else {
+    guardarProducto();
+  }
 
-      const btn = document.getElementById('downloadExcelBtn');
-      if (btn) {
-        btn.removeEventListener('click', descargarExcel);
-        btn.addEventListener('click', descargarExcel);
+  function guardarProducto() {
+    if (id) {
+      const index = products.findIndex(p => p.id === Number(id));
+      if (index !== -1) {
+        products[index] = {
+          ...products[index],
+          name, category, price, bulkPrice, commission, quantity,
+          image: imageBase64 || products[index].image
+        };
+        alert("Producto actualizado.");
       }
+    } else {
+      lastId++;
+      products.push({
+        id: lastId,
+        name, category, price, bulkPrice, commission, quantity,
+        image: imageBase64
+      });
+      alert("Producto agregado.");
     }
 
-    populateFilters();
+    saveProducts();
     renderProducts();
-    document.getElementById('welcomeMessage').textContent = `👏 Bienvenido, ${found.username}! 👏`;
-  } else {
-    alert('Usuario o contraseña incorrectos.');
+    resetForm();
   }
 });
 
-document.getElementById('applyFilter').addEventListener('click', () => renderProducts());
+document.querySelector('#productTable tbody').addEventListener('click', e => {
+  if (e.target.classList.contains('edit-btn')) {
+    const id = Number(e.target.dataset.id);
+    const p = products.find(prod => prod.id === id);
+    if (!p) return alert('Producto no encontrado');
+    document.getElementById('productId').value = p.id;
+    document.getElementById('name').value = p.name;
+    document.getElementById('category').value = p.category;
+    document.getElementById('price').value = p.price;
+    document.getElementById('bulkPrice').value = p.bulkPrice;
+    document.getElementById('commission').value = p.commission || 0;
+    document.getElementById('quantity').value = p.quantity;
+    document.getElementById('formTitle').textContent = 'Editar Producto';
+    document.getElementById('saveBtn').textContent = '✏️ Actualizar';
+    document.getElementById('cancelEditBtn').style.display = 'inline-block';
+  }
+
+  if (e.target.classList.contains('delete-btn')) {
+    const id = Number(e.target.dataset.id);
+    if (!confirm('¿Eliminar producto?')) return;
+    products = products.filter(p => p.id !== id);
+    saveProducts();
+    renderProducts();
+    alert('Producto eliminado.');
+  }
+});
+
+document.getElementById('loginBtn').addEventListener('click', async () => {
+  const user = document.getElementById('loginUser').value.trim();
+  const pass = document.getElementById('loginPass').value.trim();
+  const found = users.find(u => u.username === user && u.password === pass);
+  if (!found) return alert('Credenciales incorrectas');
+  currentUser = found;
+  document.getElementById('loginPanel').style.display = 'none';
+  document.getElementById('filterPanel').style.display = 'flex';
+  document.getElementById('productTable').style.display = 'table';
+  if (found.role === 'admin') {
+    document.getElementById('adminPanel').style.display = 'flex';
+    document.getElementById('downloadExcelBtn').addEventListener('click', descargarExcel);
+    document.getElementById('downloadPdfBtn').addEventListener('click', descargarPdf);
+  }
+  renderProducts();
+});
+
+function descargarExcel() {
+  if (!products.length) return alert("No hay productos.");
+  const ws = XLSX.utils.json_to_sheet(products.map(p => ({
+    ID: p.id, Producto: p.name, Categoría: p.category, Cantidad: p.quantity,
+    'Precio Unitario': p.price, 'Precio por Cantidad': p.bulkPrice, Comisión: p.commission
+  })));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Productos");
+  XLSX.writeFile(wb, "productos.xlsx");
+}
+
+async function descargarPdf() {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  doc.setFontSize(16);
+  doc.text("Inventario de Productos", 14, 15);
+
+  const startY = 25;
+  let currentY = startY;
+
+  for (const p of products) {
+    if (currentY > 270) {
+      doc.addPage();
+      currentY = 20;
+    }
+
+    doc.setFontSize(12);
+    doc.text(`ID: ${p.id}`, 14, currentY);
+    doc.text(`Producto: ${p.name}`, 14, currentY + 6);
+    doc.text(`Categoría: ${p.category}`, 14, currentY + 12);
+    doc.text(`Cantidad: ${p.quantity}`, 14, currentY + 18);
+    doc.text(`Precio Unitario: $${p.price.toFixed(2)}`, 14, currentY + 24);
+    doc.text(`Precio por Cantidad: $${p.bulkPrice.toFixed(2)}`, 14, currentY + 30);
+    doc.text(`Comisión: ${p.commission || 0}`, 14, currentY + 36);
+
+    // Agregar imagen si existe
+    if (p.image) {
+      try {
+        doc.addImage(p.image, 'JPEG', 130, currentY, 40, 30);
+      } catch (e) {
+        console.warn("Error al cargar imagen para PDF:", e);
+      }
+    }
+
+    currentY += 50;
+    doc.setLineWidth(0.1);
+    doc.line(10, currentY - 4, 200, currentY - 4); // línea separadora
+  }
+
+  doc.save("productos_con_imagenes.pdf");
+}
 
 (async function init() {
   await loadData();
